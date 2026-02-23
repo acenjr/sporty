@@ -1,4 +1,6 @@
 import express, { json } from "express";
+import { matchRouter } from "./routes/matches.js";
+
 const app = express();
 const PORT = 8080;
 
@@ -9,6 +11,8 @@ app.use(json());
 app.get("/", (req, res) => {
   res.send("Welcome to the new project API.");
 });
+
+app.use("/matches", matchRouter);
 
 // Start server and log the URL
 app.listen(PORT, () => {
