@@ -1,9 +1,15 @@
-import express, { json } from "express";
+import dotenv from "dotenv";
+// Initialize env vars at the very top for Node compatibility
+dotenv.config();
+
+// import AgentAPI from "apminsight";
+// AgentAPI.config();
+
+import express from "express";
 import http from "http";
-import { detectBot } from "@arcjet/node"; // Note: Ensure @arcjet/node is installed
-import { matchRouter } from "./routes/matches.js";
-import { attachWebSocketserver } from "./ws/server.js";
-// import { securityMiddleware } from "./middleware/security.js"; // Ensure this is imported
+// import { matchRouter } from "./routes/matches.js";
+import { attachWebSocketServer } from "./ws/server.js";
+import { securityMiddleware } from "./arcjet.js";
 
 const PORT = Number(process.env.PORT || 8000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -11,45 +17,56 @@ const HOST = process.env.HOST || "0.0.0.0";
 const app = express();
 const server = http.createServer(app);
 
-// 1. Core Middleware
-app.use(json());
+app.use(express.json());
 
-// 2. Arcjet Bot Detection - Mount early to stop bots before processing logic
-app.use(
-  detectBot({
-    mode: process.env.ARCJET_MODE || "LIVE", // LIVE blocks, DRY_RUN logs only
-    // allow only known search engines; do NOT include "CURL"
-    allow: ["CATEGORY:SEARCH_ENGINE"],
-  }),
-);
+// Middleware for Arcjet Security
+app.use(securityMiddleware());
 
-// 3. Manual Fallback Block for CLI tools / Missing User Agents
-app.use((req, res, next) => {
-  const ua = (req.headers["user-agent"] || "").toString();
-  if (!ua || /(^|\s)(curl|wget|httpie)(\/|\s|$)/i.test(ua)) {
-    return res.status(403).send("Forbidden: CLI tools are not allowed.");
-  }
-  next();
-});
-
-// 4. Routes
 app.get("/", (req, res) => {
-  res.send("Welcome to the new project API.");
+  res.send("Hello from Express server!");
 });
 
-// app.use(securityMiddleware()); // Re-enabled from your original block
-app.use("/matches", matchRouter);
+/**
+ * GET /matches
+ * Simple route for health checks or manual verification
+ */
+app.get("/matches", (req, res) => {
+  res.json({ message: "Success! Matches route is active." });
+});
 
-// 5. WebSocket Setup
-const { broadcastMatchCreated } = attachWebSocketserver(server);
+/**
+ * POST /matches
+ * Restored to support scripts/postMatch.js and broadcast via WebSockets
+ */
+app.post("/matches", (req, res) => {
+  const matchData = req.body;
+
+  // Log the incoming data for debugging (as seen in typical dev environments)
+  console.log("Match received:", matchData);
+
+  // Trigger the WebSocket broadcast to all connected clients
+  if (req.app.locals.broadcastMatchCreated) {
+    req.app.locals.broadcastMatchCreated(matchData);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: "Match created and broadcasted.",
+    data: matchData,
+  });
+});
+
+// app.use("/matches", matchRouter);
+
+const { broadcastMatchCreated } = attachWebSocketServer(server);
 app.locals.broadcastMatchCreated = broadcastMatchCreated;
 
-// 6. Start Server
 server.listen(PORT, HOST, () => {
   const baseUrl =
     HOST === "0.0.0.0" ? `http://localhost:${PORT}` : `http://${HOST}:${PORT}`;
-  console.log(`Server started: ${baseUrl}`);
-  console.log(
-    `Websocket server is running on ${baseUrl.replace("http", "ws")}/ws`,
-  );
+
+  console.log(`\n🚀 SERVER STARTED SUCCESSFULLY`);
+  console.log(`URL: ${baseUrl}`);
+  console.log(`Waiting for requests...`);
+  console.log(`------------------------------------------`);
 });
