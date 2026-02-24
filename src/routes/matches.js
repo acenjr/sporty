@@ -40,40 +40,19 @@ matchRouter.get("/", async (req, res) => {
 });
 
 matchRouter.post("/", async (req, res) => {
-  const parsed = createMatchSchema.safeParse(req.body);
-  const {
-    data: { startTime, endTime, homeScore, awayScore },
-  } = parsed;
-
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: "Invalid payload",
-      details: JSON.stringify(parsed.error),
-    });
-  }
-
   try {
-    const [event] = await db
-      .insert(matches)
-      .values({
-        ...parsed.data,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        homeScore: homeScore ?? 0,
-        awayScore: awayScore ?? 0,
-        status: getMatchStatus(startTime, endTime),
-      })
-      .returning();
+    const match = await createMatch(req.body);
 
-    if (res.app.locals.broadcastMatchCreated) {
-      res.app.locals.broadcastMatchCreated(event);
+    // Broadcast as best-effort - don't fail the request if it throws
+    try {
+      req.app.locals.broadcastMatchCreated(match);
+    } catch (broadcastError) {
+      console.error("Broadcast failed:", broadcastError);
+      // Continue - the match was successfully created
     }
 
-    return res.status(201).json({ data: event });
-  } catch (e) {
-    return res.status(500).json({
-      error: "Failed to create match",
-      details: e?.message ?? JSON.stringify(e),
-    });
+    res.status(201).json(match);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
