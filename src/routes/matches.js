@@ -32,12 +32,10 @@ matchRouter.get("/", async (req, res) => {
 
     res.json({ data });
   } catch (e) {
-    res
-      .status(500)
-      .json({
-        error: "Failed to fetch matches",
-        details: e?.message ?? JSON.stringify(e),
-      });
+    res.status(500).json({
+      error: "Failed to fetch matches",
+      details: e?.message ?? JSON.stringify(e),
+    });
   }
 });
 
@@ -67,13 +65,15 @@ matchRouter.post("/", async (req, res) => {
       })
       .returning();
 
+    if (res.app.locals.broadcastMatchCreated) {
+      res.app.locals.broadcastMatchCreated(event);
+    }
+
     return res.status(201).json({ data: event });
   } catch (e) {
-    return res
-      .status(500)
-      .json({
-        error: "Failed to create match",
-        details: e?.message ?? JSON.stringify(e),
-      });
+    return res.status(500).json({
+      error: "Failed to create match",
+      details: e?.message ?? JSON.stringify(e),
+    });
   }
 });
