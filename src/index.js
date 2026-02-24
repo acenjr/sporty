@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+// Initialize env vars at the very top for Node compatibility
+dotenv.config();
+
 // import AgentAPI from "apminsight";
 // AgentAPI.config();
 
@@ -15,16 +19,41 @@ const server = http.createServer(app);
 
 app.use(express.json());
 
+// Middleware for Arcjet Security
+app.use(securityMiddleware());
+
 app.get("/", (req, res) => {
   res.send("Hello from Express server!");
 });
 
-// Middleware for Arcjet Security
-app.use(securityMiddleware());
-
-// A simple route for your 'curl' loop to test against
+/**
+ * GET /matches
+ * Simple route for health checks or manual verification
+ */
 app.get("/matches", (req, res) => {
   res.json({ message: "Success! Matches route is active." });
+});
+
+/**
+ * POST /matches
+ * Restored to support scripts/postMatch.js and broadcast via WebSockets
+ */
+app.post("/matches", (req, res) => {
+  const matchData = req.body;
+
+  // Log the incoming data for debugging (as seen in typical dev environments)
+  console.log("Match received:", matchData);
+
+  // Trigger the WebSocket broadcast to all connected clients
+  if (req.app.locals.broadcastMatchCreated) {
+    req.app.locals.broadcastMatchCreated(matchData);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: "Match created and broadcasted.",
+    data: matchData,
+  });
 });
 
 // app.use("/matches", matchRouter);
