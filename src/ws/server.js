@@ -1,32 +1,55 @@
 import { WebSocketServer } from "ws";
 import { WebSocket } from "ws";
+import { wsArcjet } from "../arcjet.js";
 
 function sendJson(socket, payload) {
-  if (socket.readyState === WebSocket.OPEN) return;
+  // Logic Fix: Only send if the connection IS open
+  if (socket.readyState !== WebSocket.OPEN) return;
 
-  socket.send(stringify(payload));
+  socket.send(JSON.stringify(payload));
 }
 
 function broadcast(wss, payload) {
   for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) return;
+    // Logic Fix: Only send if the connection IS open
+    if (client.readyState !== WebSocket.OPEN) continue;
 
-    client.send(stringify(payload));
+    client.send(JSON.stringify(payload));
   }
 }
 
-export function attachWebSocketserver(server) {
+export function attachWebSocketServer(server) {
   const wss = new WebSocketServer({
     server,
     path: "/ws",
     maxPayload: 1024 * 1024,
   });
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", async (socket, req) => {
+    if (wsArcjet) {
+      try {
+        const decision = await wsArcjet.protect(socket);
+
+        if (decision.isDenied()) {
+          const code = decision.reason.isRateLimit() ? 1013 : 1008;
+          const reason = decision.reason.isRateLimit()
+            ? "Rate limit exceeded"
+            : "Connection denied by Arcjet";
+          socket.close(code, reason);
+          return;
+        }
+      } catch (e) {
+        console.log(" WebSocket Arcjet error", e);
+        socket.close(1011, "Service Unavailable");
+        return;
+      }
+    }
+
     sendJson(socket, { type: "welcome" });
 
     socket.on("error", console.error);
   });
+
   function broadcastMatchCreated(match) {
     broadcast(wss, { type: "match_created", data: match });
   }
