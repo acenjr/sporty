@@ -7,7 +7,8 @@ dotenv.config();
 
 import express from "express";
 import http from "http";
-// import { matchRouter } from "./routes/matches.js";
+import { matchRouter } from "./routes/matches.js";
+import { commentaryRouter } from "./routes/commentary.js";
 import { attachWebSocketServer } from "./ws/server.js";
 import { securityMiddleware } from "./arcjet.js";
 
@@ -19,32 +20,21 @@ const server = http.createServer(app);
 
 app.use(express.json());
 
-// Middleware for Arcjet Security
 app.use(securityMiddleware());
 
 app.get("/", (req, res) => {
   res.send("Hello from Express server!");
 });
 
-/**
- * GET /matches
- * Simple route for health checks or manual verification
- */
-app.get("/matches", (req, res) => {
-  res.json({ message: "Success! Matches route is active." });
-});
+// app.get("/matches", (req, res) => {
+//   res.json({ message: "Success! Matches route is active." });
+// });
 
-/**
- * POST /matches
- * Restored to support scripts/postMatch.js and broadcast via WebSockets
- */
 app.post("/matches", (req, res) => {
   const matchData = req.body;
 
-  // Log the incoming data for debugging (as seen in typical dev environments)
   console.log("Match received:", matchData);
 
-  // Trigger the WebSocket broadcast to all connected clients
   if (req.app.locals.broadcastMatchCreated) {
     req.app.locals.broadcastMatchCreated(matchData);
   }
@@ -56,7 +46,8 @@ app.post("/matches", (req, res) => {
   });
 });
 
-// app.use("/matches", matchRouter);
+app.use("/matches", matchRouter);
+app.use("/matches/:id/commentary", commentaryRouter);
 
 const { broadcastMatchCreated } = attachWebSocketServer(server);
 app.locals.broadcastMatchCreated = broadcastMatchCreated;

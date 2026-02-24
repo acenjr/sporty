@@ -1,8 +1,9 @@
-import { loadEnvFile } from "node:process";
+import dotenv from "dotenv";
 import arcjet, { detectBot, shield, slidingWindow } from "@arcjet/node";
 
+// Use dotenv for broader Node.js version compatibility (pre-v20.12.0 support)
 try {
-  loadEnvFile();
+  dotenv.config();
 } catch (e) {
   console.warn(
     "Notice: .env file not detected. Using system environment variables.",
