@@ -6,6 +6,8 @@ import * as Validations from "../validation/commentary.js";
 
 export const commentaryRouter = Router({ mergeParams: true });
 
+const MAX_LIMIT = 100;
+
 // GET /matches/:id/commentary - Fetch all commentary for a match
 commentaryRouter.get("/", async (req, res) => {
   try {
@@ -30,14 +32,17 @@ commentaryRouter.get("/", async (req, res) => {
     }
 
     const { id } = paramsValidation.data;
-    const { limit = 100 } = queryValidation.data;
+    const { limit = 10 } = queryValidation.data;
+
+    // Apply safety cap from original logic
+    const safeLimit = Math.min(limit, MAX_LIMIT);
 
     const results = await db
       .select()
       .from(commentary)
       .where(eq(commentary.matchId, id))
       .orderBy(desc(commentary.createdAt))
-      .limit(limit);
+      .limit(safeLimit);
 
     res.status(200).json({
       success: true,
@@ -53,7 +58,7 @@ commentaryRouter.get("/", async (req, res) => {
   }
 });
 
-// POST /matches/:id/commentary - Create new commentary entry
+// POST /matches/:id/commentary - Create and Broadcast new commentary
 commentaryRouter.post("/", async (req, res) => {
   try {
     const paramsValidation = Validations.matchIDParamsSchema.safeParse(
@@ -73,18 +78,35 @@ commentaryRouter.post("/", async (req, res) => {
       });
     }
 
-    const result = await db
+    // Insert into database
+    const [insertedComment] = await db
       .insert(commentary)
       .values({
-        matchId: paramsValidation.data.id, // Maps URL :id to match_id column
+        matchId: paramsValidation.data.id,
         ...bodyValidation.data,
         createdAt: new Date(),
       })
       .returning();
 
+    // RESTORED BROADCAST LOGIC
+    // Access the emitter attached in index.js
+    const broadcastCommentary = req.app.locals.broadcastCommentary;
+    if (broadcastCommentary) {
+      console.log(
+        "About to broadcast commentary for match:",
+        paramsValidation.data.id,
+      );
+      console.log(
+        "BroadcastCommentary function exists:",
+        !!req.app.locals.broadcastCommentary,
+      );
+
+      broadcastCommentary(paramsValidation.data.id, insertedComment);
+    }
+
     res.status(201).json({
       success: true,
-      data: result[0],
+      data: insertedComment,
     });
   } catch (error) {
     console.error("Create commentary error:", error);
