@@ -169,11 +169,14 @@ export function attachWebSocketServer(server) {
 
   // Heartbeat to clear stale connections
   const interval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-      if (ws.isAlive === false) return ws.terminate();
+    for (const ws of wss.clients) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
       ws.isAlive = false;
       ws.ping();
-    });
+    }
   }, 30000);
 
   wss.on("close", () => clearInterval(interval));
