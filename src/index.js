@@ -46,11 +46,14 @@ app.post("/matches", (req, res) => {
   });
 });
 
+const { broadcastMatchCreated, broadcastCommentary } =
+  attachWebSocketServer(server);
+
+app.locals.broadcastMatchCreated = broadcastMatchCreated;
+app.locals.broadcastCommentary = broadcastCommentary;
+
 app.use("/matches", matchRouter);
 app.use("/matches/:id/commentary", commentaryRouter);
-
-const { broadcastMatchCreated } = attachWebSocketServer(server);
-app.locals.broadcastMatchCreated = broadcastMatchCreated;
 
 server.listen(PORT, HOST, () => {
   const baseUrl =
